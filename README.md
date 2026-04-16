@@ -79,3 +79,4 @@ streamlit run app.py
 | API Docs       | http://localhost:8000/docs  |
 | Ray Dashboard  | http://localhost:8265       |
 | Streamlit UI   | http://localhost:8501       |
+# ocr
