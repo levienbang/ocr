@@ -1,0 +1,36 @@
+# Version control
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*.egg-info
+.venv
+venv
+env
+
+# Notebooks & datasets (không cần trong Docker)
+notebooks/
+datasets/
+runs/
+*.ipynb
+
+# IDE
+.vscode
+.idea
+.DS_Store
+
+# Docker
+docker-compose.yml
+.dockerignore
+
+# Misc
+*.md
+*.zip
+bus.jpg
+yolo11m.pt
+yolo11n.pt
+
+# Gemini
+.gemini/

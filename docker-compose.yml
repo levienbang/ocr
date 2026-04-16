@@ -1,0 +1,41 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ocr_backend
+    # Khởi chạy Ray cluster và sau đó deploy OCR service
+    command: >
+      bash -c "ray start --head --disable-usage-stats
+               --temp-dir=/tmp/ray_project
+               --dashboard-host=0.0.0.0 &&
+               cd /app/app && serve run ocr:entrypoint --address='auto'"
+    ports:
+      - "8000:8000"   
+      - "8265:8265"   
+    volumes:
+      - ./backend:/app
+    networks:
+      - ocr_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ocr_frontend
+    command: streamlit run /app/app/app.py --server.address=0.0.0.0
+    ports:
+      - "8501:8501"   # Cổng Streamlit UI
+    environment:
+      # Frontend gọi backend qua Docker internal network
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+    networks:
+      - ocr_network
+
+networks:
+  ocr_network:
+    driver: bridge
