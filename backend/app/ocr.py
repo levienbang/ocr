@@ -223,7 +223,8 @@ reg_model = CRNN(
     dropout=DROPOUT_PROB,
     unfreeze_layers=UNFREEZE_LAYERS,
 )
-reg_model.load_state_dict(torch.load(OCR_MODEL_PATH))
+device = "cuda" if torch.cuda.is_available() else "cpu"
+reg_model.load_state_dict(torch.load(OCR_MODEL_PATH, map_location=device))
 reg_model.eval()
 
 # ----------------  Create the service

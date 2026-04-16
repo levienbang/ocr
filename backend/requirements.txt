@@ -10,3 +10,4 @@ scikit-learn
 pygments
 pexpect
 timm
+click<=8.1.3
