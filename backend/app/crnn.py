@@ -1,6 +1,6 @@
 import timm
-import torch.nn as nn
 import torch
+import torch.nn as nn
 
 
 class CRNN(nn.Module):

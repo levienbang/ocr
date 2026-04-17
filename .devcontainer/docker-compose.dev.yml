@@ -1,0 +1,16 @@
+# Override cho môi trường phát triển (devcontainer)
+# Giữ container sống để VS Code attach vào
+services:
+  backend:
+    command: sleep infinity
+    volumes:
+      - ./backend:/app
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+
+  frontend:
+    command: sleep infinity
+    volumes:
+      - ./frontend:/app

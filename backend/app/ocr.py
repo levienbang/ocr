@@ -97,7 +97,7 @@ class APIIngress:
 
 
 @serve.deployment(
-    ray_actor_options={"num_gpus": 0.5, "num_cpus": 4},
+    ray_actor_options={"num_gpus": 0, "num_cpus": 4},
     autoscaling_config={"min_replicas": 1, "max_replicas": 2},
 )
 class OCRService:

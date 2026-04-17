@@ -1,0 +1,79 @@
+{
+  "name": "OCR Development",
+  // Sử dụng docker-compose gốc + override cho dev
+  "dockerComposeFile": [
+    "../docker-compose.yml",
+    "docker-compose.dev.yml"
+  ],
+  // Service chính mà VS Code sẽ attach vào
+  "service": "backend",
+  "workspaceFolder": "/app",
+  // Override command mặc định để giữ container sống
+  "overrideCommand": true,
+  // Cài đặt các extension hữu ích cho VS Code
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "files.trimTrailingWhitespace": true,
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter",
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        }
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        "ms-python.debugpy",
+        "ms-toolsai.jupyter",
+        "njpwerner.autodocstring",
+        "redhat.vscode-yaml",
+        "eamodio.gitlens"
+      ]
+    }
+  },
+  // Forward các port cần thiết
+  "forwardPorts": [
+    8000,
+    8265,
+    8501
+  ],
+  "portsAttributes": {
+    "8000": {
+      "label": "FastAPI Backend",
+      "onAutoForward": "notify"
+    },
+    "8265": {
+      "label": "Ray Dashboard",
+      "onAutoForward": "silent"
+    },
+    "8501": {
+      "label": "Streamlit Frontend",
+      "onAutoForward": "notify"
+    }
+  },
+  // Lệnh chạy sau khi container khởi tạo - cài lại dependencies
+  "postCreateCommand": "pip install --no-cache-dir -r requirements.txt && pip install black isort pytest",
+  // Lệnh chạy mỗi khi start container
+  "postStartCommand": "echo '✅ Dev container ready! Chạy lệnh sau để khởi động OCR service:' && echo '   ray start --head --disable-usage-stats && serve start --http-host=0.0.0.0 && serve run app.ocr:entrypoint'",
+  // Chạy bằng user root (cần cho Ray)
+  "remoteUser": "root",
+  // Tính năng bổ sung
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  // Các biến môi trường
+  "remoteEnv": {
+    "PYTHONPATH": "/app",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONUNBUFFERED": "1"
+  }
+}
