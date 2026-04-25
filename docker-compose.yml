@@ -4,6 +4,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: ocr_backend
+    shm_size: "2gb"
     # Khởi chạy Ray cluster và sau đó deploy OCR service
     command: >
       bash -c "ray start --head --disable-usage-stats --temp-dir=/tmp/ray_project --dashboard-host=0.0.0.0 && serve start --http-host=0.0.0.0 && cd /app && serve run app.ocr:entrypoint --address='auto'"

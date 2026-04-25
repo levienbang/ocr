@@ -5,20 +5,25 @@ from io import BytesIO
 import numpy as np
 import requests
 import torch
-from app.crnn import CRNN
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import Response
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 from ray import serve
 from torchvision import transforms
 from ultralytics import YOLO
 from ultralytics.utils.plotting import Annotator, colors
 
+from app.crnn import CRNN
+
 app = FastAPI()
 
 # Constants
-TEXT_DET_MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "weights", "best.pt")
-OCR_MODEL_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "weights", "ocr_crnn.pt")
+TEXT_DET_MODEL_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "weights", "best.pt"
+)
+OCR_MODEL_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "weights", "ocr_crnn.pt"
+)
 
 # Character set configuration
 CHARS = "0123456789abcdefghijklmnopqrstuvwxyz-"
@@ -97,14 +102,22 @@ class APIIngress:
 
 
 @serve.deployment(
-    ray_actor_options={"num_gpus": 0, "num_cpus": 4},
-    autoscaling_config={"min_replicas": 1, "max_replicas": 2},
+    ray_actor_options={"num_gpus": 0, "num_cpus": 1},
+    num_replicas=1,
 )
 class OCRService:
-    def __init__(self, reg_model, det_model):
+    def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.reg_model = reg_model.to(self.device)
-        self.det_model = det_model.to(self.device)
+        self.det_model = YOLO(TEXT_DET_MODEL_PATH).to(self.device)
+        self.reg_model = CRNN(
+            vocab_size=len(CHARS),
+            hidden_size=HIDDEN_SIZE,
+            n_layers=N_LAYERS,
+            dropout=DROPOUT_PROB,
+            unfreeze_layers=UNFREEZE_LAYERS,
+        ).to(self.device)
+        self.reg_model.load_state_dict(torch.load(OCR_MODEL_PATH, map_location=self.device))
+        self.reg_model.eval()
 
         # Define transform for inference
         self.transform = transforms.Compose(
@@ -160,36 +173,47 @@ class OCRService:
             raise HTTPException(status_code=500, detail=f"Error processing image: {e}")
 
     def draw_predictions(self, image, predictions):
-        """Draw predictions on the image using Ultralytics Annotator"""
-        # Convert PIL Image to numpy array
+        """Draw bounding boxes and recognized text above each box."""
         image_array = np.array(image)
-
-        # Initialize Annotator
         annotator = Annotator(image_array, font="Arial.ttf", pil=False)
 
-        # Sort predictions by y-coordinate to handle overlapping better
-        predictions = sorted(
-            predictions, key=lambda x: x[0][1]
-        )  # Sort by y1 coordinate
+        annotated_image = Image.fromarray(annotator.result())
+        draw = ImageDraw.Draw(annotated_image)
+        font = ImageFont.load_default()
+
+        predictions = sorted(predictions, key=lambda x: x[0][1])
 
         for bbox, class_name, confidence, text in predictions:
-            # Convert bbox coordinates to integers
             x1, y1, x2, y2 = [int(coord) for coord in bbox]
-
-            # Get color based on class name
             color = colors(hash(class_name) % 20, True)
 
-            # Create more compact label
-            label = f"{class_name[:3]}{confidence:.1f}:{text}"  # Shortened format
+            draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
 
-            # Draw box and label with offset
-            # Place label above the box with small offset
-            annotator.box_label(
-                [x1, y1, x2, y2], label, color=color, txt_color=(255, 255, 255)
+            label = text or class_name
+            text_bbox = draw.textbbox((0, 0), label, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            text_height = text_bbox[3] - text_bbox[1]
+
+            text_x = max(0, min(x1, annotated_image.width - text_width - 6))
+            text_y = y1 - text_height - 6
+            if text_y < 0:
+                text_y = min(y1 + 2, annotated_image.height - text_height - 4)
+
+            background_box = [
+                text_x,
+                text_y,
+                text_x + text_width + 6,
+                text_y + text_height + 4,
+            ]
+            draw.rectangle(background_box, fill=color)
+            draw.text(
+                (text_x + 3, text_y + 2),
+                label,
+                fill=(255, 255, 255),
+                font=font,
             )
 
-        # Convert back to PIL Image
-        return Image.fromarray(annotator.result())
+        return annotated_image
 
     def decode(self, encoded_sequences, idx_to_char, blank_char="-"):
         decoded_sequences = []
@@ -212,25 +236,5 @@ class OCRService:
         return decoded_sequences
 
 
-# ----------------  Initialize YOLO model
-det_model = YOLO(TEXT_DET_MODEL_PATH)
-
-# ----------------  Initialize CRNN model
-reg_model = CRNN(
-    vocab_size=len(CHARS),
-    hidden_size=HIDDEN_SIZE,
-    n_layers=N_LAYERS,
-    dropout=DROPOUT_PROB,
-    unfreeze_layers=UNFREEZE_LAYERS,
-)
-device = "cuda" if torch.cuda.is_available() else "cpu"
-reg_model.load_state_dict(torch.load(OCR_MODEL_PATH, map_location=device))
-reg_model.eval()
-
 # ----------------  Create the service
-entrypoint = APIIngress.bind(
-    OCRService.bind(
-        reg_model=reg_model,
-        det_model=det_model,
-    )
-)
+entrypoint = APIIngress.bind(OCRService.bind())
